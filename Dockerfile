@@ -1,8 +1,11 @@
-FROM rust:1.86-slim as builder
+FROM rust:1.86-slim AS builder
+
+RUN apt-get update && \
+    apt-get install -y pkg-config libssl-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY . .
-
 RUN cargo build --release
 
 FROM debian:bookworm-slim
@@ -17,6 +20,5 @@ RUN chmod +x /app/fcjp
 
 VOLUME ["/data"]
 WORKDIR /data
-
 ENTRYPOINT ["/app/fcjp"]
 CMD ["--help"]
