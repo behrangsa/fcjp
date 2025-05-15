@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format code
+        run: cargo fmt
+
+      - name: Build
+        run: cargo build --release --verbose
+
+      - name: Run tests
+        run: cargo test --release --verbose
+
+      - name: Upload Linux binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: fcjp-linux
+          path: target/release/fcjp
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build
+        run: cargo build --release --verbose
+
+      - name: Upload Windows binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcjp-windows
+          path: target/release/fcjp.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build
+        run: cargo build --release --verbose
+
+      - name: Upload macOS binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcjp-macos
+          path: target/release/fcjp
+
+  release:
+    needs: [build-and-test, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: fcjp-windows
+          path: ./windows
+
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4
+        with:
+          name: fcjp-linux
+          path: ./linux
+
+      - name: Download macOS binary
+        uses: actions/download-artifact@v4
+        with:
+          name: fcjp-macos
+          path: ./macos
+
+      - name: Create release archive for Linux
+        run: |
+          cp LICENSE ./linux/
+          cp README.md ./linux/
+          cd linux
+          tar czf ../fcjp-linux.tar.gz *
+
+      - name: Create release archive for Windows
+        run: |
+          cp LICENSE ./windows/
+          cp README.md ./windows/
+          cd windows
+          zip -r ../fcjp-windows.zip *
+
+      - name: Create release archive for macOS
+        run: |
+          cp LICENSE ./macos/
+          cp README.md ./macos/
+          cd macos
+          tar czf ../fcjp-macos.tar.gz *
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            fcjp-linux.tar.gz
+            fcjp-windows.zip
+            fcjp-macos.tar.gz
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-crate:
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to crates.io
+        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}

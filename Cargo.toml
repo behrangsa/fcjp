@@ -1,11 +1,15 @@
 [package]
 name = "fcjp"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2024"
 authors = [
     "Behrang Saeedzadeh (Studio Nutthead) hello@behrang.org"
 ]
 description = "Downloads screenshots from firecrawl.dev JSON files and re-adds them as base64 data URLs"
+repository = "https://github.com/behrangsa/fcjp"
+license = "MIT"
+keywords = ["firecrawl", "json", "screenshot", "base64"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

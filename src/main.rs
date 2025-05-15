@@ -1,18 +1,18 @@
-use std::{
-    fs,
-    error::Error,
-    path::PathBuf,
-    sync::{Arc, atomic::{AtomicUsize, Ordering}},
-};
 use clap::Parser;
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use indicatif::{ProgressBar, ProgressStyle, ParallelProgressIterator};
+use std::{
+    error::Error,
+    fs,
+    path::PathBuf,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
 
 // Import functionality from our library
-use fcjp::{
-    process_json_file, AppError, FileProcessResult,
-    IMAGE_DIR_NAME, BASE64_DIR_NAME
-};
+use fcjp::{AppError, BASE64_DIR_NAME, FileProcessResult, IMAGE_DIR_NAME, process_json_file};
 
 // --- Command-Line Arguments Definition ---
 #[derive(Parser, Debug)]
@@ -41,30 +41,46 @@ struct CliArgs {
     progress: bool,
 }
 
-
 fn main() -> Result<(), Box<dyn Error>> {
     let cli_args = CliArgs::parse();
 
-    println!("Starting screenshot processor (Rust v{})...", env!("CARGO_PKG_VERSION"));
+    println!(
+        "Starting screenshot processor (Rust v{})...",
+        env!("CARGO_PKG_VERSION")
+    );
 
     if !cli_args.directory.exists() {
-        return Err(Box::new(AppError(format!("Input directory does not exist: {:?}", cli_args.directory))));
+        return Err(Box::new(AppError(format!(
+            "Input directory does not exist: {:?}",
+            cli_args.directory
+        ))));
     }
     if !cli_args.directory.is_dir() {
-        return Err(Box::new(AppError(format!("Input path is not a directory: {:?}", cli_args.directory))));
+        return Err(Box::new(AppError(format!(
+            "Input path is not a directory: {:?}",
+            cli_args.directory
+        ))));
     }
     let canonical_input_path = fs::canonicalize(&cli_args.directory)?;
     println!("Input directory for JSON files: {:?}", canonical_input_path);
 
-    let image_dir_path = cli_args.image_output_directory
+    let image_dir_path = cli_args
+        .image_output_directory
         .unwrap_or_else(|| canonical_input_path.join(IMAGE_DIR_NAME));
-    let base64_dir_path = cli_args.base64_output_directory
+    let base64_dir_path = cli_args
+        .base64_output_directory
         .unwrap_or_else(|| canonical_input_path.join(BASE64_DIR_NAME));
 
     fs::create_dir_all(&image_dir_path)?;
-    println!("Image output directory: {:?}", fs::canonicalize(&image_dir_path)?);
+    println!(
+        "Image output directory: {:?}",
+        fs::canonicalize(&image_dir_path)?
+    );
     fs::create_dir_all(&base64_dir_path)?;
-    println!("Base64 JSON output directory: {:?}", fs::canonicalize(&base64_dir_path)?);
+    println!(
+        "Base64 JSON output directory: {:?}",
+        fs::canonicalize(&base64_dir_path)?
+    );
 
     rayon::ThreadPoolBuilder::new()
         .num_threads(cli_args.concurrency)
@@ -72,15 +88,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Using {} concurrent jobs.", cli_args.concurrency);
     println!();
 
-
     let json_files_to_process: Vec<PathBuf> = fs::read_dir(&canonical_input_path)?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
-        .filter(|path| path.is_file() && path.extension().map_or(false, |ext| ext == "json"))
+        .filter(|path| path.is_file() && path.extension().is_some_and(|ext| ext == "json"))
         .collect();
 
     if json_files_to_process.is_empty() {
-        println!("No .json files found in the input directory: {:?}", canonical_input_path);
+        println!(
+            "No .json files found in the input directory: {:?}",
+            canonical_input_path
+        );
         return Ok(());
     }
 
@@ -97,10 +115,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         None
     };
 
-    let http_client = Arc::new(reqwest::blocking::Client::builder()
-        .user_agent(format!("ScreenshotProcessor/{}", env!("CARGO_PKG_VERSION")))
-        .timeout(std::time::Duration::from_secs(60))
-        .build()?);
+    let http_client = Arc::new(
+        reqwest::blocking::Client::builder()
+            .user_agent(format!("ScreenshotProcessor/{}", env!("CARGO_PKG_VERSION")))
+            .timeout(std::time::Duration::from_secs(60))
+            .build()?,
+    );
 
     let processed_successfully = AtomicUsize::new(0);
     let skipped_files = AtomicUsize::new(0);
@@ -113,7 +133,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         .progress_with(pb_option.clone().unwrap_or_else(ProgressBar::hidden))
         .for_each(|json_path| {
             let client_clone = Arc::clone(&http_client);
-            let result = process_json_file(json_path, &image_dir_path, &base64_dir_path, &client_clone, show_ind_progress);
+            let result = process_json_file(
+                json_path,
+                &image_dir_path,
+                &base64_dir_path,
+                &client_clone,
+                show_ind_progress,
+            );
             match result {
                 FileProcessResult::Success => {
                     processed_successfully.fetch_add(1, Ordering::SeqCst);
@@ -144,13 +170,25 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("----------------------------------------");
     println!("Processing Summary:");
     println!("Total JSON files found:    {}", total_files_found);
-    println!("Processed successfully:    {}", processed_successfully.load(Ordering::SeqCst));
-    println!("Skipped (e.g., no URL):  {}", skipped_files.load(Ordering::SeqCst));
-    println!("Failed to process:       {}", failed_to_process.load(Ordering::SeqCst));
+    println!(
+        "Processed successfully:    {}",
+        processed_successfully.load(Ordering::SeqCst)
+    );
+    println!(
+        "Skipped (e.g., no URL):  {}",
+        skipped_files.load(Ordering::SeqCst)
+    );
+    println!(
+        "Failed to process:       {}",
+        failed_to_process.load(Ordering::SeqCst)
+    );
     println!("----------------------------------------");
 
     if failed_to_process.load(Ordering::SeqCst) > 0 {
-        return Err(Box::new(AppError(format!("{} files failed to process.", failed_to_process.load(Ordering::SeqCst)))));
+        return Err(Box::new(AppError(format!(
+            "{} files failed to process.",
+            failed_to_process.load(Ordering::SeqCst)
+        ))));
     }
 
     Ok(())
