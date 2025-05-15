@@ -9,4 +9,7 @@ serde_json = "1.0"
 reqwest = { version = "0.12", features = ["blocking"] }
 base64 = "0.22"
 infer = "0.19"
-clap = { version = "4.5", features = ["derive"] } # Current clap version (as of May 2024, check for latest)
+clap = { version = "4.5", features = ["derive"] }
+rayon = "1.10"
+indicatif = { version = "0.17", features = ["rayon"] }
+url = "2.5"
