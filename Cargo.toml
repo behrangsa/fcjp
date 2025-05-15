@@ -1,7 +1,11 @@
 [package]
 name = "fcjp"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
+authors = [
+    "Behrang Saeedzadeh (Studio Nutthead) hello@behrang.org"
+]
+description = "Downloads screenshots from firecrawl.dev JSON files and re-adds them as base64 data URLs"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -13,3 +17,16 @@ clap = { version = "4.5", features = ["derive"] }
 rayon = "1.10"
 indicatif = { version = "0.17", features = ["rayon"] }
 url = "2.5"
+
+[dev-dependencies]
+tempfile = "3.20"
+futures-util = "0.3"
+mockito = "1.7"
+
+[lib]
+name = "fcjp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fcjp"
+path = "src/main.rs"
